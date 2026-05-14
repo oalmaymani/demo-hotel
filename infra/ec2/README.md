@@ -21,6 +21,21 @@ chmod +x infra/ec2/setup-server.sh
 
 If you uploaded only this script first, you can also run it after cloning the repo manually.
 
+## Nginx setup
+
+To expose the app on port `80` through Nginx:
+
+```bash
+chmod +x infra/ec2/setup-nginx.sh
+./infra/ec2/setup-nginx.sh almawsimin-hotel 54.144.90.155 3000
+```
+
+Arguments:
+
+- first argument: site name
+- second argument: server name or public IP
+- third argument: app port, defaults to `3000`
+
 ## GitHub Secrets
 
 Add these repository secrets:
