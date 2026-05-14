@@ -43,4 +43,7 @@ jobs:
             git checkout "$BRANCH"
             git reset --hard "origin/$BRANCH"
 
-            docker compose -f infra/compose/docker-compose.yml up -d --build
+            export COMPOSE_BAKE=false
+            docker compose -f infra/compose/docker-compose.yml build backend
+            docker compose -f infra/compose/docker-compose.yml build frontend
+            docker compose -f infra/compose/docker-compose.yml up -d
