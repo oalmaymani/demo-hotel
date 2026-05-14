@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum BookingChannel {
+  WEBSITE
+  PHONE
+  AGENCY
+  OTA
+}
+
+enum PaymentMethod {
+  UNSPECIFIED
+  CASH
+  CARD
+  MADA
+  VISA
+  TRANSFER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum InvoiceStatus {
+  NOT_ISSUED
+  ISSUED
+  VOID
+}
+
+enum BookingRequestType {
+  UPGRADE
+  EARLY_CHECKIN
+  LATE_CHECKOUT
+  OTHER
+}
+
+enum BookingRequestStatus {
+  PENDING
+  AWAITING_CUSTOMER
+  APPROVED
+  REJECTED
+}
+
+enum BookingRequestActor {
+  ADMIN
+  CUSTOMER
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  permissions  String[] @default([])
+  isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model UnitType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameAr      String
+  nameEn      String
+  bedrooms    Int
+  hasMajlis   Boolean  @default(true)
+  kitchen     String   // LARGE | SMALL | NONE
+  descriptionAr String
+  descriptionEn String
+  basePrice   Int      // SAR per night
+  imageUrl    String?
+  images      UnitImage[]
+  seasonalRates SeasonalRate[]
+  minStayRules  MinStayRule[]
+  units       Unit[]
+  bookings    Booking[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UnitImage {
+  id         String   @id @default(cuid())
+  unitTypeId String
+  unitType   UnitType @relation(fields: [unitTypeId], references: [id])
+  url        String
+  isPrimary  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([unitTypeId, isPrimary])
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  number    Int      @unique
+  floor     Int
+  isActive  Boolean  @default(true)
+  unitTypeId String
+  unitType  UnitType @relation(fields: [unitTypeId], references: [id])
+  photos    UnitPhoto[]
+  bookings  Booking[]
+  blocks    BlockedDate[]
+}
+
+model SeasonalRate {
+  id          String   @id @default(cuid())
+  unitTypeId  String
+  unitType    UnitType @relation(fields: [unitTypeId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  pricePerNight Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([unitTypeId, startDate, endDate])
+}
+
+model MinStayRule {
+  id          String   @id @default(cuid())
+  unitTypeId  String
+  unitType    UnitType @relation(fields: [unitTypeId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  minNights   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([unitTypeId, startDate, endDate])
+}
+
+model UnitPhoto {
+  id         String   @id @default(cuid())
+  unitId     String
+  unit       Unit     @relation(fields: [unitId], references: [id])
+  url        String
+  isPrimary  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([unitId, isPrimary])
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  bookingCode String?      @unique
+  unitId     String
+  unit       Unit          @relation(fields: [unitId], references: [id])
+  unitTypeId String
+  unitType   UnitType      @relation(fields: [unitTypeId], references: [id])
+
+  guestName  String
+  guestPhone String
+  guestEmail String?
+  notes      String?
+
+  guestsCount Int @default(1)
+
+  checkIn    DateTime
+  checkOut   DateTime
+
+  status     BookingStatus @default(PENDING)
+  channel    BookingChannel @default(WEBSITE)
+  paymentMethod PaymentMethod @default(UNSPECIFIED)
+  paymentStatus PaymentStatus @default(UNPAID)
+  invoiceStatus InvoiceStatus @default(NOT_ISSUED)
+  paymentProvider String?
+  paymentReference String?
+  nationality String?
+  totalAmount Int?
+  discountPercent Int?
+  discountAmount Int?
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  requests   BookingRequest[]
+
+  @@index([unitId, checkIn, checkOut])
+}
+
+model BookingRequest {
+  id              String               @id @default(cuid())
+  bookingId       String
+  booking         Booking              @relation(fields: [bookingId], references: [id])
+  type            BookingRequestType
+  message         String?
+  status          BookingRequestStatus @default(PENDING)
+  responseMessage String?
+  customerResponse String?
+  customerRespondedAt DateTime?
+  messages        BookingRequestMessage[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([bookingId, status])
+}
+
+model BookingRequestMessage {
+  id         String               @id @default(cuid())
+  requestId  String
+  request    BookingRequest       @relation(fields: [requestId], references: [id])
+  actor      BookingRequestActor
+  message    String
+  createdAt  DateTime             @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model BlockedDate {
+  id        String   @id @default(cuid())
+  unitId    String
+  unit      Unit     @relation(fields: [unitId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([unitId, startDate, endDate])
+}

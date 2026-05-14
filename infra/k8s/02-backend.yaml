@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: towseasons
+type: Opaque
+stringData:
+  DATABASE_URL: postgresql://towseasons:towseasons@postgres:5432/towseasons?schema=public
+  JWT_SECRET: change_me_super_secret
+  ADMIN_EMAIL: admin@towseasons.local
+  ADMIN_PASSWORD: Admin@12345
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: towseasons
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      containers:
+        - name: backend
+          image: towseasons-backend:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "4000"
+            - name: NODE_ENV
+              value: "production"
+            - name: CORS_ORIGIN
+              value: "http://frontend:3000"
+          envFrom:
+            - secretRef: { name: backend-secret }
+          ports:
+            - containerPort: 4000
+          command: ["sh","-lc"]
+          args:
+            - >
+              npx prisma migrate deploy &&
+              node prisma/seed.js &&
+              node dist/index.js
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: towseasons
+spec:
+  selector: { app: backend }
+  ports:
+    - port: 4000
+      targetPort: 4000

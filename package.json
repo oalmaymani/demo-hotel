@@ -1,0 +1,16 @@
+{
+  "name": "towseasons-serviced-apartments",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm -w apps/backend run dev & npm -w apps/frontend run dev",
+    "build": "npm -w apps/backend run build && npm -w apps/frontend run build",
+    "lint": "npm -w apps/backend run lint && npm -w apps/frontend run lint"
+  },
+  "overrides": {
+    "path-to-regexp": "0.1.13",
+    "postcss": "8.5.14"
+  }
+}
