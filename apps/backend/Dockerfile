@@ -18,6 +18,5 @@ RUN apt-get update -y && apt-get install -y openssl
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
-COPY .env.example ./.env.example
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
