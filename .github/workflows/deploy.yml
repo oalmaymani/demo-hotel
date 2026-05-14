@@ -44,6 +44,7 @@ jobs:
             git reset --hard "origin/$BRANCH"
 
             export COMPOSE_BAKE=false
+            docker compose -f infra/compose/docker-compose.yml down --remove-orphans || true
             docker compose -f infra/compose/docker-compose.yml build backend
             docker compose -f infra/compose/docker-compose.yml build frontend
             docker compose -f infra/compose/docker-compose.yml up -d
