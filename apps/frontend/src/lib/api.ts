@@ -1,6 +1,6 @@
-const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4000";
-const INTERNAL_API_BASE = process.env.API_INTERNAL_BASE || PUBLIC_API_BASE;
 const isServer = typeof window === "undefined";
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE || (isServer ? "http://localhost:4000" : "");
+const INTERNAL_API_BASE = process.env.API_INTERNAL_BASE || PUBLIC_API_BASE;
 
 export const API_BASE = isServer ? INTERNAL_API_BASE : PUBLIC_API_BASE;
 

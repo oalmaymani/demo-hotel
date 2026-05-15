@@ -27,7 +27,7 @@ To expose the app on port `80` through Nginx:
 
 ```bash
 chmod +x infra/ec2/setup-nginx.sh
-./infra/ec2/setup-nginx.sh almawsimin-hotel 54.144.90.155 3000
+./infra/ec2/setup-nginx.sh almawsimin-hotel 54.144.90.155 3000 4000
 ```
 
 Arguments:
@@ -35,6 +35,7 @@ Arguments:
 - first argument: site name
 - second argument: server name or public IP
 - third argument: app port, defaults to `3000`
+- fourth argument: backend API port, defaults to `4000`
 
 ## GitHub Secrets
 
