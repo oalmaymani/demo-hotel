@@ -37,6 +37,20 @@ Arguments:
 - third argument: app port, defaults to `3000`
 - fourth argument: backend API port, defaults to `4000`
 
+## SSL setup
+
+To issue and install a Let's Encrypt certificate with automatic HTTP to HTTPS redirect:
+
+```bash
+chmod +x infra/ec2/setup-ssl.sh
+./infra/ec2/setup-ssl.sh almawsimin.serve-hotels.com you@example.com
+```
+
+Arguments:
+
+- first argument: domain name already pointing to the server
+- second argument: email for Let's Encrypt notifications
+
 ## GitHub Secrets
 
 Add these repository secrets:
