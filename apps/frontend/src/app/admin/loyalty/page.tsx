@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { getMessages, isRTL, type Locale } from "@/lib/i18n";
+import { adminAddLoyaltyBenefit, adminDeleteLoyaltyBenefit, adminGetLoyaltyProgram, adminUpdateLoyaltyProgram } from "@/lib/api";
 
 type LoyaltyProgram = {
   id: string;
@@ -81,11 +82,7 @@ function AdminLoyaltyContent() {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || ""}/admin/loyalty-program`, {
-        headers: { Authorization: `Bearer ${t}` }
-      });
-      if (!response.ok) throw new Error("Failed to load program");
-      const data = (await response.json()) as LoyaltyProgram;
+      const data = await adminGetLoyaltyProgram(t);
       setProgram(data);
       setIsEnabled(data.isEnabled);
       setMinRepeatBookings(data.minRepeatBookings);
@@ -115,21 +112,12 @@ function AdminLoyaltyContent() {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || ""}/admin/loyalty-program`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          isEnabled,
-          minRepeatBookings,
-          descriptionAr,
-          descriptionEn
-        })
+      const data = await adminUpdateLoyaltyProgram(token, {
+        isEnabled,
+        minRepeatBookings,
+        descriptionAr,
+        descriptionEn
       });
-      if (!response.ok) throw new Error("Failed to save program");
-      const data = (await response.json()) as LoyaltyProgram;
       setProgram(data);
     } catch (e: any) {
       setError(e?.message || "Failed");
@@ -148,30 +136,20 @@ function AdminLoyaltyContent() {
     setAddingBenefit(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || ""}/admin/loyalty-benefits`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nameAr: benefitNameAr,
-          nameEn: benefitNameEn,
-          descriptionAr: benefitDescAr,
-          descriptionEn: benefitDescEn,
-          type: benefitType,
-          value: benefitValue
-        })
+      await adminAddLoyaltyBenefit(token, {
+        nameAr: benefitNameAr,
+        nameEn: benefitNameEn,
+        descriptionAr: benefitDescAr,
+        descriptionEn: benefitDescEn,
+        type: benefitType,
+        value: benefitValue
       });
-      if (!response.ok) throw new Error("Failed to add benefit");
-      
       setBenefitNameAr("");
       setBenefitNameEn("");
       setBenefitDescAr("");
       setBenefitDescEn("");
       setBenefitType("DISCOUNT_PERCENT");
       setBenefitValue(10);
-      
       await loadProgram(token);
     } catch (e: any) {
       setError(e?.message || "Failed");
@@ -184,11 +162,7 @@ function AdminLoyaltyContent() {
     if (!token || !canManage || !confirm(locale === "ar" ? "هل تريد الحذف؟" : "Are you sure?")) return;
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || ""}/admin/loyalty-benefits/${benefitId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error("Failed to delete benefit");
+      await adminDeleteLoyaltyBenefit(token, benefitId);
       await loadProgram(token);
     } catch (e: any) {
       setError(e?.message || "Failed");

@@ -232,6 +232,49 @@ export async function adminUpdateSettings(token: string, payload: { heroImageUrl
   return data as SiteSettings;
 }
 
+export async function adminGetLoyaltyProgram(token: string) {
+  const res = await fetch(`${API_BASE}/api/admin/loyalty-program`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  if (!res.ok) throw new Error("Failed to load loyalty program");
+  return await res.json();
+}
+
+export async function adminUpdateLoyaltyProgram(token: string, payload: { isEnabled?: boolean; minRepeatBookings?: number; descriptionAr?: string; descriptionEn?: string }) {
+  const res = await fetch(`${API_BASE}/api/admin/loyalty-program`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || "Failed to update loyalty program");
+  return data;
+}
+
+export async function adminAddLoyaltyBenefit(
+  token: string,
+  payload: { nameAr: string; nameEn: string; descriptionAr?: string; descriptionEn?: string; type: string; value: number }
+) {
+  const res = await fetch(`${API_BASE}/api/admin/loyalty-benefits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || "Failed to add loyalty benefit");
+  return data;
+}
+
+export async function adminDeleteLoyaltyBenefit(token: string, id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/loyalty-benefits/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("Failed to delete loyalty benefit");
+  return await res.json();
+}
+
 export async function adminAddSeasonalRate(
   token: string,
   unitTypeId: string,
