@@ -241,3 +241,32 @@ model BlockedDate {
 
   @@index([unitId, startDate, endDate])
 }
+
+model LoyaltyProgram {
+  id                String   @id @default(cuid())
+  isEnabled         Boolean  @default(true)
+  minRepeatBookings Int      @default(1)
+  descriptionAr     String   @default("")
+  descriptionEn     String   @default("")
+  benefits          LoyaltyBenefit[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model LoyaltyBenefit {
+  id              String   @id @default(cuid())
+  programId       String
+  program         LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  nameAr          String
+  nameEn          String
+  descriptionAr   String?
+  descriptionEn   String?
+  type            String   // "DISCOUNT_PERCENT" | "DISCOUNT_FIXED" | "BONUS_POINTS" | "FREE_UPGRADE"
+  value           Int      // percentage for discount, SAR for fixed amount, points for bonus
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([programId, isActive])
+}

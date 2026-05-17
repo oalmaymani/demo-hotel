@@ -172,6 +172,9 @@ function AdminUsersContent() {
             <Link href={`/admin/calendar?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
               {m.calendar}
             </Link>
+            <Link href={`/admin/loyalty?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
+              {locale === "ar" ? "الولاء" : "Loyalty"}
+            </Link>
           </div>
           <button onClick={logout} className="px-4 py-2 rounded-xl border hover:bg-bg text-sm">
             {m.logout}

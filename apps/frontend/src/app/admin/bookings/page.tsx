@@ -263,6 +263,9 @@ function AdminBookingsContent() {
             <Link href={`/admin/calendar?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
               {m.calendar}
             </Link>
+            <Link href={`/admin/loyalty?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
+              {locale === "ar" ? "الولاء" : "Loyalty"}
+            </Link>
             {canManageUsers ? (
               <Link href={`/admin/users?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
                 {m.users}

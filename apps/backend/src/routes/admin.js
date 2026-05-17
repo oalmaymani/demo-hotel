@@ -8,6 +8,7 @@ import { prisma } from '../db.js';
 import { parseISODateOnly } from '../utils/dates.js';
 import { requireAdmin, requirePermission, signAdminToken } from '../utils/auth.js';
 import { sendBookingConfirmedEmail } from '../services/email.js';
+import { applyLoyaltyDiscount, getRepeatCustomerBookings } from '../utils/loyalty.js';
 
 export const adminRouter = Router();
 const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -198,16 +199,19 @@ adminRouter.get('/bookings', requirePermission('bookings:view'), asyncHandler(as
 
     if (seenConfirmed.has(phone)) {
       if (!booking.discountPercent && typeof booking.totalAmount === 'number') {
-        const discountPercent = 15;
-        const discountAmount = Math.round(booking.totalAmount * 0.15);
-        const totalAmount = Math.max(0, booking.totalAmount - discountAmount);
-        updates.push(prisma.booking.update({
-          where: { id: booking.id },
-          data: { discountPercent, discountAmount, totalAmount }
-        }));
-        booking.discountPercent = discountPercent;
-        booking.discountAmount = discountAmount;
-        booking.totalAmount = totalAmount;
+        const priorCount = await getRepeatCustomerBookings(phone, booking.id);
+        const { discountPercent, discountAmount } = await applyLoyaltyDiscount(booking, phone, priorCount);
+        
+        if (discountPercent > 0 && discountAmount > 0) {
+          const totalAmount = Math.max(0, booking.totalAmount - discountAmount);
+          updates.push(prisma.booking.update({
+            where: { id: booking.id },
+            data: { discountPercent, discountAmount, totalAmount }
+          }));
+          booking.discountPercent = discountPercent;
+          booking.discountAmount = discountAmount;
+          booking.totalAmount = totalAmount;
+        }
       }
     }
 
@@ -246,20 +250,15 @@ adminRouter.patch('/bookings/:id/status', requirePermission('bookings:status'), 
 
   let discountData = {};
   if (shouldApplyDiscount) {
-    const priorConfirmed = await prisma.booking.findFirst({
-      where: {
-        guestPhone: existing.guestPhone,
-        status: 'CONFIRMED',
-        id: { not: existing.id },
-        createdAt: { lt: existing.createdAt }
-      },
-      select: { id: true }
-    });
-    if (priorConfirmed) {
-      const discountPercent = 15;
-      const discountAmount = Math.round(existing.totalAmount * 0.15);
-      const totalAmount = Math.max(0, existing.totalAmount - discountAmount);
-      discountData = { discountPercent, discountAmount, totalAmount };
+    const priorConfirmedCount = await getRepeatCustomerBookings(existing.guestPhone, existing.id);
+    
+    if (priorConfirmedCount > 0) {
+      const { discountPercent, discountAmount } = await applyLoyaltyDiscount(existing, existing.guestPhone, priorConfirmedCount);
+      
+      if (discountPercent > 0 && discountAmount > 0) {
+        const totalAmount = Math.max(0, existing.totalAmount - discountAmount);
+        discountData = { discountPercent, discountAmount, totalAmount };
+      }
     }
   }
 
@@ -739,5 +738,124 @@ adminRouter.delete('/blocks/:id', requireAdmin, asyncHandler(async (req, res) =>
   if (!existing) return res.status(404).json({ message: 'Not found' });
 
   await prisma.blockedDate.delete({ where: { id: req.params.id } });
+  res.json({ id: req.params.id });
+}));
+
+// Loyalty Program APIs
+adminRouter.get('/loyalty-program', requireAdmin, asyncHandler(async (_req, res) => {
+  let program = await prisma.loyaltyProgram.findFirst({
+    include: {
+      benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }
+    }
+  });
+
+  if (!program) {
+    program = await prisma.loyaltyProgram.create({
+      data: { isEnabled: true },
+      include: {
+        benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }
+      }
+    });
+  }
+
+  res.json(program);
+}));
+
+adminRouter.patch('/loyalty-program', requireAdmin, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    isEnabled: z.boolean().optional(),
+    minRepeatBookings: z.number().int().min(1).optional(),
+    descriptionAr: z.string().optional(),
+    descriptionEn: z.string().optional()
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
+
+  let program = await prisma.loyaltyProgram.findFirst();
+  if (!program) {
+    program = await prisma.loyaltyProgram.create({ data: {} });
+  }
+
+  const updated = await prisma.loyaltyProgram.update({
+    where: { id: program.id },
+    data: parsed.data,
+    include: {
+      benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }
+    }
+  });
+
+  res.json(updated);
+}));
+
+adminRouter.post('/loyalty-benefits', requireAdmin, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    nameAr: z.string().min(1),
+    nameEn: z.string().min(1),
+    descriptionAr: z.string().optional(),
+    descriptionEn: z.string().optional(),
+    type: z.enum(['DISCOUNT_PERCENT', 'DISCOUNT_FIXED', 'BONUS_POINTS', 'FREE_UPGRADE']),
+    value: z.number().int().min(1)
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
+
+  let program = await prisma.loyaltyProgram.findFirst();
+  if (!program) {
+    program = await prisma.loyaltyProgram.create({ data: {} });
+  }
+
+  const maxSortOrder = await prisma.loyaltyBenefit.aggregate({
+    where: { programId: program.id },
+    _max: { sortOrder: true }
+  });
+  const sortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1;
+
+  const benefit = await prisma.loyaltyBenefit.create({
+    data: {
+      programId: program.id,
+      nameAr: parsed.data.nameAr,
+      nameEn: parsed.data.nameEn,
+      descriptionAr: parsed.data.descriptionAr || '',
+      descriptionEn: parsed.data.descriptionEn || '',
+      type: parsed.data.type,
+      value: parsed.data.value,
+      isActive: true,
+      sortOrder
+    }
+  });
+
+  res.status(201).json(benefit);
+}));
+
+adminRouter.patch('/loyalty-benefits/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    nameAr: z.string().min(1).optional(),
+    nameEn: z.string().min(1).optional(),
+    descriptionAr: z.string().optional(),
+    descriptionEn: z.string().optional(),
+    type: z.enum(['DISCOUNT_PERCENT', 'DISCOUNT_FIXED', 'BONUS_POINTS', 'FREE_UPGRADE']).optional(),
+    value: z.number().int().min(1).optional(),
+    isActive: z.boolean().optional(),
+    sortOrder: z.number().int().optional()
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
+
+  const existing = await prisma.loyaltyBenefit.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: 'Benefit not found' });
+
+  const updated = await prisma.loyaltyBenefit.update({
+    where: { id: req.params.id },
+    data: parsed.data
+  });
+
+  res.json(updated);
+}));
+
+adminRouter.delete('/loyalty-benefits/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.loyaltyBenefit.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: 'Benefit not found' });
+
+  await prisma.loyaltyBenefit.delete({ where: { id: req.params.id } });
   res.json({ id: req.params.id });
 }));
