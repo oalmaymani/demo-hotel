@@ -23,8 +23,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
       - name: Run lint
         run: npm run lint
 
-      - name: Run build
-        run: npm run build
+      - name: Run build (Backend)
+        run: npm run build --workspace=@towseasons/backend
+
+      - name: Run build (Frontend)
+        run: npm run build --workspace=@towseasons/frontend
+
+      - name: Verify deployment configuration
+        run: |
+          if [ ! -f "infra/compose/docker-compose.yml" ]; then
+            echo "Docker compose file not found!"
+            exit 1
+          fi
+          docker compose -f infra/compose/docker-compose.yml config > /dev/null

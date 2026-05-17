@@ -43,8 +43,29 @@ jobs:
             git checkout "$BRANCH"
             git reset --hard "origin/$BRANCH"
 
+            echo "Pulling latest code..."
+            git pull origin "$BRANCH"
+
+            echo "Stopping current containers..."
             export COMPOSE_BAKE=false
             docker compose -f infra/compose/docker-compose.yml down --remove-orphans || true
+
+            echo "Building backend service..."
             docker compose -f infra/compose/docker-compose.yml build backend
+
+            echo "Building frontend service..."
             docker compose -f infra/compose/docker-compose.yml build frontend
+
+            echo "Starting services..."
             docker compose -f infra/compose/docker-compose.yml up -d
+
+            echo "Waiting for backend to be ready..."
+            sleep 10
+
+            echo "Running database migrations..."
+            docker compose -f infra/compose/docker-compose.yml exec -T backend npx prisma migrate deploy || true
+
+            echo "Restarting backend to apply changes..."
+            docker compose -f infra/compose/docker-compose.yml restart backend
+
+            echo "✅ Deployment completed successfully!"
