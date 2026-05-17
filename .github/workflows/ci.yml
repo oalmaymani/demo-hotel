@@ -24,7 +24,7 @@ jobs:
         run: npm ci
 
       - name: Validate Prisma schema
-        run: npx prisma validate
+        run: cd apps/backend && npx prisma validate --schema=prisma/schema.prisma
 
       - name: Run lint
         run: npm run lint
