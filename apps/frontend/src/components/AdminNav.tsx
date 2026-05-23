@@ -46,22 +46,22 @@ export default function AdminNav() {
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="px-3 py-2 rounded-xl bg-primary text-white text-sm">{m.admin}</span>
-              <Link href={`/admin/bookings?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {m.bookings}
-              </Link>
-              <Link href={`/admin/requests?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {m.customerRequests}
-              </Link>
-              <Link href={`/admin/availability?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {m.availability}
-              </Link>
-              <Link href={`/admin/calendar?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {m.calendar}
-              </Link>
-              <Link href={`/admin/loyalty?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {locale === "ar" ? "الولاء" : "Loyalty"}
-              </Link>
-              {canManageUsers ? (
+              {(
+                [
+                  { href: "/admin/bookings", label: m.bookings },
+                  { href: "/admin/requests", label: m.customerRequests },
+                  { href: "/admin/availability", label: m.availability },
+                  { href: "/admin/calendar", label: m.calendar },
+                  { href: "/admin/loyalty", label: locale === "ar" ? "الولاء" : "Loyalty" },
+                ] as { href: string; label: string }[]
+              )
+                .filter((it) => !(pathname ?? "").startsWith(it.href))
+                .map((it) => (
+                  <Link key={it.href} href={`${it.href}?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
+                    {it.label}
+                  </Link>
+                ))}
+              {canManageUsers && !pathname?.startsWith("/admin/users") ? (
                 <Link href={`/admin/users?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
                   {m.users}
                 </Link>
