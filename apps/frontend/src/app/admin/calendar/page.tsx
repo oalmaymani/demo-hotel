@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
+// Navbar is provided by admin layout
 import { getMessages, isRTL, type Locale } from "@/lib/i18n";
 import { adminGetBlocks, adminGetBookings, adminGetUnits } from "@/lib/api";
 
@@ -102,7 +102,6 @@ function AdminCalendarContent() {
 
   return (
     <div dir={isRTL(locale) ? "rtl" : "ltr"} className="min-h-screen">
-      <Navbar brand={m.brand} locale={locale} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">

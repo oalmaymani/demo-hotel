@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
+// Navbar is provided by admin layout
 import { getMessages, isRTL, type Locale } from "@/lib/i18n";
 import {
   adminAddUnitImage,
@@ -779,7 +779,6 @@ function AdminAvailabilityContent() {
 
   return (
     <div dir={isRTL(locale) ? "rtl" : "ltr"} className="min-h-screen">
-      <Navbar brand={m.brand} locale={locale} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-col gap-4 mb-6">
           <div className="rounded-3xl bg-white border shadow-sm p-4">

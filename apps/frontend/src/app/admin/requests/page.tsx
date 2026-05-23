@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
+// Navbar is provided by admin layout
 import { getMessages, isRTL, type Locale } from "@/lib/i18n";
 import {
   adminGetBookingRequests,
@@ -175,31 +175,7 @@ function AdminRequestsContent() {
 
   return (
     <div dir={isRTL(locale) ? "rtl" : "ltr"} className="min-h-screen">
-      <Navbar brand={m.brand} locale={locale} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-2 rounded-xl bg-primary text-white text-sm">{m.customerRequests}</span>
-            <Link href={`/admin/bookings?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-              {m.bookings}
-            </Link>
-            <Link href={`/admin/availability?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-              {m.availability}
-            </Link>
-            <Link href={`/admin/calendar?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-              {m.calendar}
-            </Link>
-            {canManageUsers ? (
-              <Link href={`/admin/users?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                {m.users}
-              </Link>
-            ) : null}
-          </div>
-          <button onClick={logout} className="px-4 py-2 rounded-xl border hover:bg-bg text-sm">
-            {m.logout}
-          </button>
-        </div>
-
         {!canManageRequests ? (
           <div className="mb-3 p-3 rounded-xl bg-amber-50 border text-amber-800 text-sm">
             {m.noPermission}
