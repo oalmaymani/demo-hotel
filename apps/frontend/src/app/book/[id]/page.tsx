@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { getCountries, getCountryCallingCode } from "libphonenumber-js";
 import { Navbar } from "@/components/Navbar";
 import { getMessages, isRTL, type Locale } from "@/lib/i18n";
+import nationalities from '@/lib/nationalities.json';
 import {
   API_BASE,
   createBooking,
@@ -199,7 +200,12 @@ function BookPageContent() {
             </label>
             <label className="flex flex-col gap-1 text-sm text-gray-700">
               {m.nationality}
-              <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="px-3 py-2 rounded-xl border" />
+              <select value={nationality} onChange={(e) => setNationality(e.target.value)} className="px-3 py-2 rounded-xl border">
+                <option value="">{locale === 'ar' ? 'اختر الجنسية' : 'Select nationality'}</option>
+                {nationalities.map((n: any) => (
+                  <option key={n.code} value={n.name_ar}>{n.name_ar}</option>
+                ))}
+              </select>
             </label>
             <label className="flex flex-col gap-1 text-sm text-gray-700 md:col-span-2">
               {m.notes}

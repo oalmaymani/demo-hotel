@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
+import { applyLoyaltyDiscount, getRepeatCustomerBookings } from '../utils/loyalty.js';
 import { parseISODateOnly } from '../utils/dates.js';
 import { countAvailableUnitsForType, findAvailableUnitForType } from '../services/availability.js';
 
@@ -208,16 +209,22 @@ publicRouter.post('/bookings', asyncHandler(async (req, res) => {
   const rates = await getSeasonalRatesForRange(unitType.id, checkIn, checkOut);
   const priceSummary = buildPriceSummary({ basePrice: unitType.basePrice, checkIn, checkOut, rates });
   const baseTotal = priceSummary?.total ?? unitType.basePrice * nights;
-  const hasPriorConfirmed = await prisma.booking.findFirst({
-    where: {
-      guestPhone: data.data.guestPhone,
-      status: 'CONFIRMED'
-    },
-    select: { id: true }
-  });
-  const discountPercent = hasPriorConfirmed ? 15 : null;
-  const discountAmount = hasPriorConfirmed ? Math.round(baseTotal * 0.15) : null;
-  const totalAmount = hasPriorConfirmed ? Math.max(0, baseTotal - (discountAmount ?? 0)) : baseTotal;
+  let discountPercent = null;
+  let discountAmount = null;
+  let totalAmount = baseTotal;
+  let loyaltyRateApplied = null;
+  let loyaltyDiscountAmount = null;
+  if (data.data.guestPhone) {
+    const priorConfirmedCount = await getRepeatCustomerBookings(data.data.guestPhone, null);
+    const res = await applyLoyaltyDiscount({ totalAmount: baseTotal }, data.data.guestPhone, priorConfirmedCount);
+    if (res.discountPercent > 0 && res.discountAmount > 0) {
+      discountPercent = res.discountPercent;
+      discountAmount = res.discountAmount;
+      totalAmount = Math.max(0, baseTotal - discountAmount);
+      loyaltyRateApplied = res.discountPercent;
+      loyaltyDiscountAmount = res.discountAmount;
+    }
+  }
 
   const bookingCode = await generateBookingCode();
   const booking = await prisma.booking.create({
@@ -240,7 +247,10 @@ publicRouter.post('/bookings', asyncHandler(async (req, res) => {
       nationality: data.data.nationality,
       totalAmount,
       discountPercent,
-      discountAmount
+      discountAmount,
+      loyaltyRateApplied,
+      loyaltyDiscountAmount,
+      loyaltyAppliedAt: loyaltyRateApplied ? new Date() : undefined
     }
   });
   res.status(201).json({ id: booking.id, bookingCode: booking.bookingCode });

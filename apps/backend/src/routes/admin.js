@@ -279,6 +279,55 @@ adminRouter.patch('/bookings/:id/status', requirePermission('bookings:status'), 
   res.json({ id: booking.id, status: booking.status });
 }));
 
+// Update or remove loyalty snapshot/discount for a booking
+adminRouter.patch('/bookings/:id/loyalty', requirePermission('bookings:status'), asyncHandler(async (req, res) => {
+  const schema = z.object({ action: z.enum(['remove', 'set']), rate: z.number().int().min(0).optional() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
+
+  const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+
+  // Derive base amount (assume stored totalAmount = base - discountAmount)
+  const baseAmount = (existing.totalAmount ?? 0) + (existing.discountAmount ?? 0);
+
+  if (parsed.data.action === 'remove') {
+    const updated = await prisma.booking.update({
+      where: { id: req.params.id },
+      data: {
+        discountPercent: null,
+        discountAmount: null,
+        totalAmount: baseAmount,
+        loyaltyRateApplied: null,
+        loyaltyDiscountAmount: null,
+        loyaltyAppliedAt: null
+      }
+    });
+    return res.json(updated);
+  }
+
+  // set new rate
+  if (parsed.data.action === 'set') {
+    if (parsed.data.rate === undefined) return res.status(400).json({ message: 'Missing rate' });
+    const rate = parsed.data.rate;
+    const discountAmount = Math.round(baseAmount * (rate / 100));
+    const totalAmount = Math.max(0, baseAmount - discountAmount);
+    const updated = await prisma.booking.update({
+      where: { id: req.params.id },
+      data: {
+        discountPercent: rate,
+        discountAmount,
+        totalAmount,
+        loyaltyRateApplied: rate,
+        loyaltyDiscountAmount: discountAmount,
+        loyaltyAppliedAt: new Date()
+      }
+    });
+    return res.json(updated);
+  }
+  res.status(400).json({ message: 'Invalid action' });
+}));
+
 adminRouter.get('/booking-requests', requirePermission('requests:manage'), asyncHandler(async (_req, res) => {
   const requests = await prisma.bookingRequest.findMany({
     orderBy: { createdAt: 'desc' },

@@ -194,6 +194,9 @@ model Booking {
   totalAmount Int?
   discountPercent Int?
   discountAmount Int?
+  loyaltyRateApplied Int?
+  loyaltyDiscountAmount Int?
+  loyaltyAppliedAt DateTime?
 
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
