@@ -9,6 +9,7 @@ import { parseISODateOnly } from '../utils/dates.js';
 import { requireAdmin, requirePermission, signAdminToken } from '../utils/auth.js';
 import { sendBookingConfirmedEmail } from '../services/email.js';
 import { applyLoyaltyDiscount, getRepeatCustomerBookings } from '../utils/loyalty.js';
+import { getLoyaltyProgram } from '../utils/loyalty.js';
 
 export const adminRouter = Router();
 const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -326,6 +327,113 @@ adminRouter.patch('/bookings/:id/loyalty', requirePermission('bookings:status'),
     return res.json(updated);
   }
   res.status(400).json({ message: 'Invalid action' });
+}));
+
+// Loyalty program endpoints
+adminRouter.get('/loyalty', requireAdmin, asyncHandler(async (_req, res) => {
+  const program = await getLoyaltyProgram();
+  res.json(program);
+}));
+
+adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler(async (req, res) => {
+  // Accept partial updates for program and benefits array
+  const schema = z.object({
+    isEnabled: z.boolean().optional(),
+    minRepeatBookings: z.number().int().min(0).optional(),
+    descriptionAr: z.string().optional(),
+    descriptionEn: z.string().optional(),
+    benefits: z.array(z.object({ id: z.string().optional(), nameAr: z.string(), nameEn: z.string(), descriptionAr: z.string().optional(), descriptionEn: z.string().optional(), type: z.string(), value: z.number().int(), isActive: z.boolean().optional(), sortOrder: z.number().int().optional() })).optional()
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
+
+  const updates = {};
+  if (parsed.data.isEnabled !== undefined) updates.isEnabled = parsed.data.isEnabled;
+  if (parsed.data.minRepeatBookings !== undefined) updates.minRepeatBookings = parsed.data.minRepeatBookings;
+  if (parsed.data.descriptionAr !== undefined) updates.descriptionAr = parsed.data.descriptionAr;
+  if (parsed.data.descriptionEn !== undefined) updates.descriptionEn = parsed.data.descriptionEn;
+
+  let program = await prisma.loyaltyProgram.findFirst({ include: { benefits: true } });
+  if (!program) {
+    program = await prisma.loyaltyProgram.create({ data: { isEnabled: true }, include: { benefits: true } });
+  }
+
+  if (Object.keys(updates).length > 0) {
+    program = await prisma.loyaltyProgram.update({ where: { id: program.id }, data: updates, include: { benefits: true } });
+  }
+
+  // Upsert benefits if provided
+  if (parsed.data.benefits) {
+    // For simplicity: remove existing benefits and recreate from provided list
+    await prisma.loyaltyBenefit.deleteMany({ where: { programId: program.id } });
+    const created = [];
+    for (const b of parsed.data.benefits) {
+      const c = await prisma.loyaltyBenefit.create({ data: {
+        programId: program.id,
+        nameAr: b.nameAr,
+        nameEn: b.nameEn,
+        descriptionAr: b.descriptionAr ?? '',
+        descriptionEn: b.descriptionEn ?? '',
+        type: b.type,
+        value: b.value,
+        isActive: b.isActive ?? true,
+        sortOrder: b.sortOrder ?? 0
+      }});
+      created.push(c);
+    }
+    program = await prisma.loyaltyProgram.findUnique({ where: { id: program.id }, include: { benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } } });
+  }
+
+  // If program updated, recalculate upcoming bookings' loyalty discounts
+  // Criteria: bookings with checkIn >= today (start of day) and paymentStatus != 'PAID'
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const candidates = await prisma.booking.findMany({
+    where: {
+      checkIn: { gte: todayStart },
+      paymentStatus: { not: 'PAID' },
+      status: { in: ['PENDING', 'CONFIRMED'] }
+    }
+  });
+
+  const updates = [];
+  for (const b of candidates) {
+    if (!b.guestPhone) continue;
+    const priorConfirmed = await getRepeatCustomerBookings(b.guestPhone, b.id);
+    const res = await applyLoyaltyDiscount({ totalAmount: b.totalAmount ?? 0 }, b.guestPhone, priorConfirmed);
+    if (res.discountPercent > 0 && res.discountAmount > 0) {
+      const baseAmount = (b.totalAmount ?? 0) + (b.discountAmount ?? 0);
+      const discountAmount = res.discountAmount;
+      const totalAmount = Math.max(0, baseAmount - discountAmount);
+      updates.push(prisma.booking.update({ where: { id: b.id }, data: {
+        discountPercent: res.discountPercent,
+        discountAmount,
+        totalAmount,
+        loyaltyRateApplied: res.discountPercent,
+        loyaltyDiscountAmount: discountAmount,
+        loyaltyAppliedAt: new Date()
+      }}));
+    } else {
+      // remove existing loyalty snapshot if any
+      if (b.discountPercent || b.loyaltyRateApplied) {
+        const baseAmount = (b.totalAmount ?? 0) + (b.discountAmount ?? 0);
+        updates.push(prisma.booking.update({ where: { id: b.id }, data: {
+          discountPercent: null,
+          discountAmount: null,
+          totalAmount: baseAmount,
+          loyaltyRateApplied: null,
+          loyaltyDiscountAmount: null,
+          loyaltyAppliedAt: null
+        }}));
+      }
+    }
+  }
+
+  if (updates.length) await Promise.all(updates);
+
+  const updatedProgram = await prisma.loyaltyProgram.findUnique({ where: { id: program.id }, include: { benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } } });
+  res.json({ program: updatedProgram, updatedBookings: updates.length });
 }));
 
 adminRouter.get('/booking-requests', requirePermission('requests:manage'), asyncHandler(async (_req, res) => {
