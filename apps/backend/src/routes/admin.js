@@ -331,8 +331,13 @@ adminRouter.patch('/bookings/:id/loyalty', requirePermission('bookings:status'),
 
 // Loyalty program endpoints
 adminRouter.get('/loyalty', requireAdmin, asyncHandler(async (_req, res) => {
-  const program = await getLoyaltyProgram();
-  res.json(program);
+  try {
+    const program = await getLoyaltyProgram();
+    res.json(program);
+  } catch (err) {
+    console.error('GET /admin/loyalty error', err);
+    res.status(500).json({ message: 'Failed to fetch loyalty program' });
+  }
 }));
 
 adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler(async (req, res) => {
@@ -347,7 +352,8 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
 
-  const updates = {};
+  try {
+    const updates = {};
   if (parsed.data.isEnabled !== undefined) updates.isEnabled = parsed.data.isEnabled;
   if (parsed.data.minRepeatBookings !== undefined) updates.minRepeatBookings = parsed.data.minRepeatBookings;
   if (parsed.data.descriptionAr !== undefined) updates.descriptionAr = parsed.data.descriptionAr;
@@ -358,12 +364,12 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
     program = await prisma.loyaltyProgram.create({ data: { isEnabled: true }, include: { benefits: true } });
   }
 
-  if (Object.keys(updates).length > 0) {
-    program = await prisma.loyaltyProgram.update({ where: { id: program.id }, data: updates, include: { benefits: true } });
-  }
+    if (Object.keys(updates).length > 0) {
+      program = await prisma.loyaltyProgram.update({ where: { id: program.id }, data: updates, include: { benefits: true } });
+    }
 
   // Upsert benefits if provided
-  if (parsed.data.benefits) {
+    if (parsed.data.benefits) {
     // For simplicity: remove existing benefits and recreate from provided list
     await prisma.loyaltyBenefit.deleteMany({ where: { programId: program.id } });
     const created = [];
@@ -430,10 +436,14 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
     }
   }
 
-  if (updates.length) await Promise.all(updates);
+    if (updates.length) await Promise.all(updates);
 
-  const updatedProgram = await prisma.loyaltyProgram.findUnique({ where: { id: program.id }, include: { benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } } });
-  res.json({ program: updatedProgram, updatedBookings: updates.length });
+    const updatedProgram = await prisma.loyaltyProgram.findUnique({ where: { id: program.id }, include: { benefits: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } } });
+    res.json({ program: updatedProgram, updatedBookings: updates.length });
+  } catch (err) {
+    console.error('PATCH /admin/loyalty error', err);
+    res.status(500).json({ message: 'Failed to update loyalty program' });
+  }
 }));
 
 adminRouter.get('/booking-requests', requirePermission('requests:manage'), asyncHandler(async (_req, res) => {
