@@ -48,6 +48,52 @@ export async function applyLoyaltyDiscount(booking, guestPhone, priorConfirmedCo
   return { discountPercent, discountAmount };
 }
 
+export function getBookingBaseAmount(booking) {
+  if (typeof booking.totalAmount !== 'number') return null;
+  return booking.totalAmount + (booking.discountAmount ?? 0);
+}
+
+export function getTodayStartUtc(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+export function isUpcomingBooking(booking, now = new Date()) {
+  return booking.checkIn && booking.checkIn >= getTodayStartUtc(now);
+}
+
+export async function getCurrentLoyaltyUpdateData(booking, priorConfirmedCount = 0) {
+  const baseAmount = getBookingBaseAmount(booking);
+  if (!booking.guestPhone || !baseAmount || baseAmount <= 0) {
+    return null;
+  }
+
+  const { discountPercent, discountAmount } = await applyLoyaltyDiscount(
+    { totalAmount: baseAmount },
+    booking.guestPhone,
+    priorConfirmedCount
+  );
+
+  if (discountPercent > 0 && discountAmount > 0) {
+    return {
+      discountPercent,
+      discountAmount,
+      totalAmount: Math.max(0, baseAmount - discountAmount),
+      loyaltyRateApplied: discountPercent,
+      loyaltyDiscountAmount: discountAmount,
+      loyaltyAppliedAt: new Date()
+    };
+  }
+
+  return {
+    discountPercent: null,
+    discountAmount: null,
+    totalAmount: baseAmount,
+    loyaltyRateApplied: null,
+    loyaltyDiscountAmount: null,
+    loyaltyAppliedAt: null
+  };
+}
+
 export async function getRepeatCustomerBookings(guestPhone, beforeBookingId) {
   const count = await prisma.booking.count({
     where: {

@@ -8,7 +8,7 @@ import { prisma } from '../db.js';
 import { parseISODateOnly } from '../utils/dates.js';
 import { requireAdmin, requirePermission, signAdminToken } from '../utils/auth.js';
 import { sendBookingConfirmedEmail } from '../services/email.js';
-import { applyLoyaltyDiscount, getRepeatCustomerBookings } from '../utils/loyalty.js';
+import { getCurrentLoyaltyUpdateData, getRepeatCustomerBookings, getTodayStartUtc } from '../utils/loyalty.js';
 import { getLoyaltyProgram } from '../utils/loyalty.js';
 
 export const adminRouter = Router();
@@ -35,6 +35,29 @@ const upload = multer({
     cb(new Error('Only images are allowed'));
   }
 });
+
+async function syncUpcomingLoyaltyBookings() {
+  const candidates = await prisma.booking.findMany({
+    where: {
+      checkIn: { gte: getTodayStartUtc() },
+      paymentStatus: { not: 'PAID' },
+      status: { in: ['PENDING', 'CONFIRMED'] }
+    }
+  });
+
+  const updates = [];
+  for (const booking of candidates) {
+    if (!booking.guestPhone) continue;
+    const priorConfirmedCount = await getRepeatCustomerBookings(booking.guestPhone, booking.id);
+    const discountData = await getCurrentLoyaltyUpdateData(booking, priorConfirmedCount);
+    if (discountData) {
+      updates.push(prisma.booking.update({ where: { id: booking.id }, data: discountData }));
+    }
+  }
+
+  if (updates.length) await Promise.all(updates);
+  return updates.length;
+}
 
 const permissionEnum = z.enum([
   'bookings:view',
@@ -191,32 +214,24 @@ adminRouter.get('/bookings', requirePermission('bookings:view'), asyncHandler(as
       requests: { where: { type: 'UPGRADE', status: 'APPROVED' }, select: { id: true } }
     }
   });
-  const seenConfirmed = new Set();
   const updates = [];
 
   for (const booking of bookingsAsc) {
     const phone = booking.guestPhone;
     if (booking.status !== 'CONFIRMED' || !phone) continue;
 
-    if (seenConfirmed.has(phone)) {
-      if (!booking.discountPercent && typeof booking.totalAmount === 'number') {
-        const priorCount = await getRepeatCustomerBookings(phone, booking.id);
-        const { discountPercent, discountAmount } = await applyLoyaltyDiscount(booking, phone, priorCount);
-        
-        if (discountPercent > 0 && discountAmount > 0) {
-          const totalAmount = Math.max(0, booking.totalAmount - discountAmount);
-          updates.push(prisma.booking.update({
-            where: { id: booking.id },
-            data: { discountPercent, discountAmount, totalAmount }
-          }));
-          booking.discountPercent = discountPercent;
-          booking.discountAmount = discountAmount;
-          booking.totalAmount = totalAmount;
-        }
+    if (booking.checkIn >= getTodayStartUtc()) {
+      const priorCount = await getRepeatCustomerBookings(phone, booking.id);
+      const discountData = await getCurrentLoyaltyUpdateData(booking, priorCount);
+
+      if (discountData) {
+        updates.push(prisma.booking.update({
+          where: { id: booking.id },
+          data: discountData
+        }));
+        Object.assign(booking, discountData);
       }
     }
-
-    seenConfirmed.add(phone);
   }
 
   if (updates.length) {
@@ -243,24 +258,15 @@ adminRouter.patch('/bookings/:id/status', requirePermission('bookings:status'), 
 
   const shouldApplyDiscount = (
     parsed.data.status === 'CONFIRMED' &&
-    existing.status !== 'CONFIRMED' &&
-    !existing.discountPercent &&
     typeof existing.totalAmount === 'number' &&
-    existing.guestPhone
+    existing.guestPhone &&
+    existing.checkIn >= getTodayStartUtc()
   );
 
   let discountData = {};
   if (shouldApplyDiscount) {
     const priorConfirmedCount = await getRepeatCustomerBookings(existing.guestPhone, existing.id);
-    
-    if (priorConfirmedCount > 0) {
-      const { discountPercent, discountAmount } = await applyLoyaltyDiscount(existing, existing.guestPhone, priorConfirmedCount);
-      
-      if (discountPercent > 0 && discountAmount > 0) {
-        const totalAmount = Math.max(0, existing.totalAmount - discountAmount);
-        discountData = { discountPercent, discountAmount, totalAmount };
-      }
-    }
+    discountData = await getCurrentLoyaltyUpdateData(existing, priorConfirmedCount) ?? {};
   }
 
   const booking = await prisma.booking.update({
@@ -392,8 +398,7 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
 
   // If program updated, recalculate upcoming bookings' loyalty discounts
   // Criteria: bookings with checkIn >= today (start of day) and paymentStatus != 'PAID'
-  const now = new Date();
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayStart = getTodayStartUtc();
 
   const candidates = await prisma.booking.findMany({
     where: {
@@ -407,32 +412,9 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
   for (const b of candidates) {
     if (!b.guestPhone) continue;
     const priorConfirmed = await getRepeatCustomerBookings(b.guestPhone, b.id);
-    const res = await applyLoyaltyDiscount({ totalAmount: b.totalAmount ?? 0 }, b.guestPhone, priorConfirmed);
-    if (res.discountPercent > 0 && res.discountAmount > 0) {
-      const baseAmount = (b.totalAmount ?? 0) + (b.discountAmount ?? 0);
-      const discountAmount = res.discountAmount;
-      const totalAmount = Math.max(0, baseAmount - discountAmount);
-      updates.push(prisma.booking.update({ where: { id: b.id }, data: {
-        discountPercent: res.discountPercent,
-        discountAmount,
-        totalAmount,
-        loyaltyRateApplied: res.discountPercent,
-        loyaltyDiscountAmount: discountAmount,
-        loyaltyAppliedAt: new Date()
-      }}));
-    } else {
-      // remove existing loyalty snapshot if any
-      if (b.discountPercent || b.loyaltyRateApplied) {
-        const baseAmount = (b.totalAmount ?? 0) + (b.discountAmount ?? 0);
-        updates.push(prisma.booking.update({ where: { id: b.id }, data: {
-          discountPercent: null,
-          discountAmount: null,
-          totalAmount: baseAmount,
-          loyaltyRateApplied: null,
-          loyaltyDiscountAmount: null,
-          loyaltyAppliedAt: null
-        }}));
-      }
+    const discountData = await getCurrentLoyaltyUpdateData(b, priorConfirmed);
+    if (discountData) {
+      updates.push(prisma.booking.update({ where: { id: b.id }, data: discountData }));
     }
   }
 
@@ -951,6 +933,7 @@ adminRouter.patch('/loyalty-program', requireAdmin, asyncHandler(async (req, res
     }
   });
 
+  await syncUpcomingLoyaltyBookings();
   res.json(updated);
 }));
 
@@ -991,6 +974,7 @@ adminRouter.post('/loyalty-benefits', requireAdmin, asyncHandler(async (req, res
     }
   });
 
+  await syncUpcomingLoyaltyBookings();
   res.status(201).json(benefit);
 }));
 
@@ -1016,6 +1000,7 @@ adminRouter.patch('/loyalty-benefits/:id', requireAdmin, asyncHandler(async (req
     data: parsed.data
   });
 
+  await syncUpcomingLoyaltyBookings();
   res.json(updated);
 }));
 
@@ -1024,5 +1009,6 @@ adminRouter.delete('/loyalty-benefits/:id', requireAdmin, asyncHandler(async (re
   if (!existing) return res.status(404).json({ message: 'Benefit not found' });
 
   await prisma.loyaltyBenefit.delete({ where: { id: req.params.id } });
+  await syncUpcomingLoyaltyBookings();
   res.json({ id: req.params.id });
 }));

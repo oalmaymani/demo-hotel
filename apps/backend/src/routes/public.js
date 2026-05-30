@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { applyLoyaltyDiscount, getRepeatCustomerBookings } from '../utils/loyalty.js';
+import { applyLoyaltyDiscount, getCurrentLoyaltyUpdateData, getRepeatCustomerBookings, isUpcomingBooking } from '../utils/loyalty.js';
 import { parseISODateOnly } from '../utils/dates.js';
 import { countAvailableUnitsForType, findAvailableUnitForType } from '../services/availability.js';
 
@@ -284,23 +284,13 @@ publicRouter.post('/booking-lookup', asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Not found' });
   }
 
-  if (!booking.discountPercent && typeof booking.totalAmount === 'number' && booking.guestPhone) {
-    const priorConfirmed = await prisma.booking.findFirst({
-      where: {
-        guestPhone: booking.guestPhone,
-        status: 'CONFIRMED',
-        id: { not: booking.id },
-        createdAt: { lt: booking.createdAt }
-      },
-      select: { id: true }
-    });
-    if (priorConfirmed) {
-      const discountPercent = 15;
-      const discountAmount = Math.round(booking.totalAmount * 0.15);
-      const totalAmount = Math.max(0, booking.totalAmount - discountAmount);
+  if (isUpcomingBooking(booking) && typeof booking.totalAmount === 'number' && booking.guestPhone) {
+    const priorConfirmedCount = await getRepeatCustomerBookings(booking.guestPhone, booking.id);
+    const discountData = await getCurrentLoyaltyUpdateData(booking, priorConfirmedCount);
+    if (discountData) {
       booking = await prisma.booking.update({
         where: { id: booking.id },
-        data: { discountPercent, discountAmount, totalAmount },
+        data: discountData,
         include: {
           unit: { select: { number: true, floor: true } },
           unitType: { select: { nameAr: true, nameEn: true } },
