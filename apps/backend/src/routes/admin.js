@@ -353,19 +353,19 @@ adminRouter.patch('/loyalty', requirePermission('bookings:status'), asyncHandler
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload', issues: parsed.error.issues });
 
   try {
-    const updates = {};
-  if (parsed.data.isEnabled !== undefined) updates.isEnabled = parsed.data.isEnabled;
-  if (parsed.data.minRepeatBookings !== undefined) updates.minRepeatBookings = parsed.data.minRepeatBookings;
-  if (parsed.data.descriptionAr !== undefined) updates.descriptionAr = parsed.data.descriptionAr;
-  if (parsed.data.descriptionEn !== undefined) updates.descriptionEn = parsed.data.descriptionEn;
+    const programUpdates = {};
+  if (parsed.data.isEnabled !== undefined) programUpdates.isEnabled = parsed.data.isEnabled;
+  if (parsed.data.minRepeatBookings !== undefined) programUpdates.minRepeatBookings = parsed.data.minRepeatBookings;
+  if (parsed.data.descriptionAr !== undefined) programUpdates.descriptionAr = parsed.data.descriptionAr;
+  if (parsed.data.descriptionEn !== undefined) programUpdates.descriptionEn = parsed.data.descriptionEn;
 
   let program = await prisma.loyaltyProgram.findFirst({ include: { benefits: true } });
   if (!program) {
     program = await prisma.loyaltyProgram.create({ data: { isEnabled: true }, include: { benefits: true } });
   }
 
-    if (Object.keys(updates).length > 0) {
-      program = await prisma.loyaltyProgram.update({ where: { id: program.id }, data: updates, include: { benefits: true } });
+    if (Object.keys(programUpdates).length > 0) {
+      program = await prisma.loyaltyProgram.update({ where: { id: program.id }, data: programUpdates, include: { benefits: true } });
     }
 
   // Upsert benefits if provided
