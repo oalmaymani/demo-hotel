@@ -7,6 +7,7 @@ export function Navbar({ brand, locale }: { brand: string; locale: "ar" | "en" }
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+  const isAdminPage = pathname?.startsWith("/admin");
 
   function toggleLocale() {
     const next = locale === "ar" ? "en" : "ar";
@@ -22,9 +23,11 @@ export function Navbar({ brand, locale }: { brand: string; locale: "ar" | "en" }
           {brand}
         </Link>
         <div className="flex items-center gap-3">
-          <Link href={`/my-bookings?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-            {locale === "ar" ? "حجوزاتي" : "My bookings"}
-          </Link>
+          {!isAdminPage ? (
+            <Link href={`/my-bookings?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
+              {locale === "ar" ? "حجوزاتي" : "My bookings"}
+            </Link>
+          ) : null}
           <button
             onClick={toggleLocale}
             className="px-3 py-2 rounded-xl border hover:bg-bg text-sm"
