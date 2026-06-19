@@ -12,8 +12,8 @@ function AdminLoginContent() {
   const locale: Locale = sp.get("lang") === "en" ? "en" : "ar";
   const m = getMessages(locale);
 
-  const [email, setEmail] = useState("admin@demo.local");
-  const [password, setPassword] = useState("Admin@12345");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
