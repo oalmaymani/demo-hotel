@@ -1,5 +1,5 @@
 {
-  "name": "towseasons-serviced-apartments",
+  "name": "demo-serviced-apartments",
   "private": true,
   "workspaces": [
     "apps/*"

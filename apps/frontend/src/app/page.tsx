@@ -118,7 +118,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         </section>
 
         <footer className="mt-12 text-sm text-gray-600 py-6">
-          {locale === "ar" ? "© الموسمين للشقق المفروشة" : "© Tow-seasons Serviced Apartments"}
+          {locale === "ar" ? "© الشقق المفروشة" : "© Serviced Apartments"}
         </footer>
       </main>
     </div>

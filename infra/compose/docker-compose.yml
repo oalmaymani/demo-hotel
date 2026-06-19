@@ -1,3 +1,5 @@
+name: demo
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,7 +8,7 @@ services:
       POSTGRES_USER: towseasons
       POSTGRES_PASSWORD: towseasons
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,17 +25,17 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://towseasons:towseasons@postgres:5432/towseasons?schema=public
       JWT_SECRET: change_me_super_secret
-      ADMIN_EMAIL: admin@towseasons.local
+      ADMIN_EMAIL: admin@demo.local
       ADMIN_PASSWORD: Admin@12345
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3001
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       SENDGRID_FROM: osaid1418@gmail.com
-      SENDGRID_FROM_NAME: TOW-seasons-Hotel
+      SENDGRID_FROM_NAME: الشقق المفروشة
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "4000:4000"
+      - "4001:4000"
     volumes:
       - backend_uploads:/app/uploads
     command: >
@@ -52,7 +54,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "3001:3000"
 
 volumes:
   pgdata:

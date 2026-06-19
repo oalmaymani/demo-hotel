@@ -1,4 +1,4 @@
-# الموسمين للشقق المفروشة — Tow-seasons Serviced Apartments
+# الشقق المفروشة — Demo
 Monorepo: **Next.js (Frontend)** + **Node/Express (Backend)** + **PostgreSQL**  
 يدعم لغتين: **العربية (RTL)** و **English (LTR)** + لوحة أدمن.
 
@@ -10,12 +10,12 @@ cd infra/compose
 docker compose up -d --build
 ```
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
-- Admin: http://localhost:3000/admin/login
+- Frontend: http://localhost:3001
+- Backend API: http://localhost:4001
+- Admin: http://localhost:3001/admin/login
 
 ### بيانات الأدمن الافتراضية
-- Email: `admin@towseasons.local`
+- Email: `admin@demo.local`
 - Password: `Admin@12345`
 
 > غيّرها بعد أول دخول.
@@ -54,4 +54,3 @@ kubectl apply -f .
 راجع:
 - `docs/WIREFRAMES.md`
 - `docs/UI-DESIGN.md`
-
