@@ -35,7 +35,6 @@ export default function AdminNav() {
     router.push(`/admin/login?lang=${locale}`);
   }
 
-  const canManageUsers = isSuperAdmin || permissions.includes("users:manage");
   const showAdminNav = !pathname?.includes("/admin/login");
 
   return (
@@ -53,6 +52,7 @@ export default function AdminNav() {
                   { href: "/admin/availability", label: m.availability },
                   { href: "/admin/calendar", label: m.calendar },
                   { href: "/admin/loyalty", label: locale === "ar" ? "الولاء" : "Loyalty" },
+                  { href: "/admin/users", label: m.users },
                 ] as { href: string; label: string }[]
               )
                 .filter((it) => !(pathname ?? "").startsWith(it.href))
@@ -61,11 +61,6 @@ export default function AdminNav() {
                     {it.label}
                   </Link>
                 ))}
-              {canManageUsers && !pathname?.startsWith("/admin/users") ? (
-                <Link href={`/admin/users?lang=${locale}`} className="px-3 py-2 rounded-xl border text-sm hover:bg-bg">
-                  {m.users}
-                </Link>
-              ) : null}
             </div>
             <button onClick={logout} className="px-4 py-2 rounded-xl border hover:bg-bg text-sm">
               {m.logout}

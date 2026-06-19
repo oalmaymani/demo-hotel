@@ -63,7 +63,8 @@ function AdminUsersContent() {
     { key: "bookings:view", label: m.permissionBookingsView },
     { key: "bookings:status", label: m.permissionBookingsStatus },
     { key: "bookings:unit", label: m.permissionBookingsUnit },
-    { key: "requests:manage", label: m.permissionRequestsManage }
+    { key: "requests:manage", label: m.permissionRequestsManage },
+    { key: "users:manage", label: m.permissionUsersManage }
   ]), [m]);
 
   async function loadUsers(t: string) {
