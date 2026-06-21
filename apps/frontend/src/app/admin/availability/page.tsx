@@ -117,7 +117,10 @@ function AdminAvailabilityContent() {
 
   useEffect(() => {
     const t = localStorage.getItem("towseasons_admin_token");
-    if (!t) {
+    if (!t || t === "undefined" || t === "null") {
+      localStorage.removeItem("towseasons_admin_token");
+      localStorage.removeItem("towseasons_admin_perms");
+      localStorage.removeItem("towseasons_admin_super");
       router.push(`/admin/login?lang=${locale}`);
       return;
     }

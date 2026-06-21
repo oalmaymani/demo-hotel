@@ -179,11 +179,22 @@ export async function adminLogin(email: string, password: string) {
   return data as { token: string; permissions?: string[]; isSuperAdmin?: boolean };
 }
 
+function handleAdminUnauthorized(res: Response) {
+  if (res.status !== 401 || isServer) return;
+  localStorage.removeItem("towseasons_admin_token");
+  localStorage.removeItem("towseasons_admin_perms");
+  localStorage.removeItem("towseasons_admin_super");
+  const current = new URL(window.location.href);
+  const lang = current.searchParams.get("lang") === "en" ? "en" : "ar";
+  window.location.href = `/admin/login?lang=${lang}`;
+}
+
 export async function adminGetBookings(token: string) {
   const res = await fetch(`${API_BASE}/api/admin/bookings`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
+  handleAdminUnauthorized(res);
   if (!res.ok) throw new Error("Failed to load bookings");
   return await res.json();
 }
@@ -217,6 +228,7 @@ export async function adminGetSettings(token: string) {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
+  handleAdminUnauthorized(res);
   if (!res.ok) throw new Error("Failed to load settings");
   return (await res.json()) as SiteSettings;
 }
@@ -359,6 +371,7 @@ export async function adminGetUnits(token: string) {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
+  handleAdminUnauthorized(res);
   if (!res.ok) throw new Error("Failed to load units");
   return await res.json();
 }
@@ -399,6 +412,7 @@ export async function adminGetUnitTypes(token: string) {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
+  handleAdminUnauthorized(res);
   if (!res.ok) throw new Error("Failed to load unit types");
   return await res.json();
 }
@@ -444,6 +458,7 @@ export async function adminGetBlocks(token: string) {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
+  handleAdminUnauthorized(res);
   if (!res.ok) throw new Error("Failed to load blocks");
   return await res.json();
 }
