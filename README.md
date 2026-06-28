@@ -1,4 +1,4 @@
-# الشقق المفروشة — Demo
+# منشئة ايواء — Demo
 Monorepo: **Next.js (Frontend)** + **Node/Express (Backend)** + **PostgreSQL**  
 يدعم لغتين: **العربية (RTL)** و **English (LTR)** + لوحة أدمن.
 
